@@ -1,0 +1,89 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "cmake --build ${workspaceRoot}/.build",
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$go"
+            ]
+        },
+
+        {
+            "label": "Write firmware to MCU",
+            "type": "shell",
+            "key": "F9",
+            "command": "JLinkExe -Device STM32F105RC -If SWD -Speed 4000 _JLink/FlashMCU.jlink",
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+
+        {
+            "label": "Erase flash MCU",
+            "type": "shell",
+            "command": "JLinkExe -Device STM32F105RC -If SWD -Speed 4000 _JLink/EraseMCU.jlink",
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+
+        {
+			"label": "Reset MCU",
+			"type": "shell",
+			"command": "JLinkExe -Device STM32F105RC -If SWD -Speed 1000 _JLink/ResetMCU.jlink",
+			"options": {
+				"cwd": "${workspaceRoot}",
+			}, 
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": []
+		},
+
+        {
+			"label": "Read Flash from MCU",
+			"type": "shell",
+			"command": "JLinkExe -Device STM32F105RC -If SWD -Speed 1000 _JLink/ReadMCU.jlink",
+			"options": {
+				"cwd": "${workspaceRoot}",
+			}, 
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": []
+		},
+
+        {
+            "label": "Cmake Clean",
+            "type": "shell",
+            "command": "rm -rf .build",
+            "options": {
+                "cwd": "${workspaceRoot}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+
+    ]
+}

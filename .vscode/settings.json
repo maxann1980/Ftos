@@ -1,0 +1,12 @@
+{
+    "cortex-debug.gdbPath": "/usr/bin/arm-none-eabi-gdb",
+    "cortex-debug.armToolchainPath": "/usr/bin",
+    "cortex-debug.JLinkGDBServerPath": "/opt/SEGGER/JLink/Jlink/JLinkGDBServer",
+    "files.associations": {
+        "*.tcc": "cpp",
+        "cstdio": "cpp",
+        "flash_w25.h": "c",
+        "main.h": "c",
+        "freertosconfig.h": "c"
+    }
+}
