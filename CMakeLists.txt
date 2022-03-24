@@ -74,6 +74,7 @@ add_definitions(-DSTM32F105xC)
 set(SOURCE_FILES 
     Core/Src/main.cpp
     Core/Src/freertos.c
+    Core/Src/syscalls.c
     Core/Src/stm32f1xx_it.c
     Core/Src/stm32f1xx_hal_msp.c
     Core/Src/stm32f1xx_hal_timebase_tim.c

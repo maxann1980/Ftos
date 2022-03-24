@@ -1,8 +1,11 @@
 #include "main.h"
+#include "stdio.h"
 
 #include "FreeRTOS.h"
 #include "string.h"
 #include "task.h"
+
+#define IDLE_BUF_SIZE   30
 
 typedef struct TaskData_t {
     uint8_t *str;
@@ -18,20 +21,22 @@ static void MX_USART2_UART_Init(void);
 
 uint8_t task1_text[] = "Hello from First Task \r\n";
 uint8_t task2_text[] = "*******Hello from Second Task*******\r\n";
+volatile uint32_t idle_count = 0;
+
 
 void MyTask(void *pvParameters) {
-    uint16_t size = strlen((const char*)task1_text);
+    uint16_t size = strlen((const char *)pvParameters);
+    uint8_t buf[IDLE_BUF_SIZE] = {0};
     while (1) {
-      vTaskDelay(pdMS_TO_TICKS(1000));
-      HAL_UART_Transmit(&huart2,task1_text, size, 1000);
-    }
-    vTaskDelete(NULL);
-}
-
-void MyTask1(void *pvParameters) {
-    uint16_t size = strlen((const char*)task2_text);
-    while (HAL_OK == HAL_UART_Transmit(&huart2,task2_text, size, 1000)) {
-        vTaskDelay(pdMS_TO_TICKS(500));
+        for (int i = 0; i < size; ++i) {
+            HAL_UART_Transmit(&huart2, &((uint8_t *)pvParameters)[i], 1, 100);
+        }
+        snprintf((char*)buf,IDLE_BUF_SIZE,"idle count : %ld \r\n",idle_count);
+        int cnt_size = strlen((char*)buf);
+        for (int i = 0; i < cnt_size; ++i) {
+            HAL_UART_Transmit(&huart2, &buf[i], 1, 100);
+        }
+        vTaskDelay(pdMS_TO_TICKS(1200));
     }
     vTaskDelete(NULL);
 }
@@ -66,13 +71,6 @@ void LedTask1(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-extern "C" void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
-    uint16_t size = strlen(pcTaskName);
-    uint8_t error[] = "Stack overflow";
-    HAL_UART_Transmit(&huart2, error, strlen((const char*)error), 1000);
-    HAL_UART_Transmit(&huart2, (uint8_t*)pcTaskName, size, 1000);
-}
-
 TaskData data1 ,data2;
 
 int main(void) {
@@ -83,12 +81,7 @@ int main(void) {
 
     data1 = {
         .str = task1_text,
-        .period = 800
-    };
-
-    data2 = {
-        .str = task2_text,
-        .period = 1200
+        .period = 1000
     };
 
 
@@ -100,30 +93,13 @@ int main(void) {
         }
     }
 
-    res = xTaskCreate(CommonTask,"Common Task2",256, (void*)&data2,configMAX_PRIORITIES,NULL);
+    res = xTaskCreate(MyTask, "Second Task", 256, task2_text,configMAX_PRIORITIES, NULL);
     if (res != pdTRUE) {
         while (1) {
             // HAL_Delay(500);
             // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
         }
     }
-
-
-    // auto res = xTaskCreate(MyTask,"First Task",256, NULL,configMAX_PRIORITIES,NULL);
-    // if (res != pdTRUE) {
-    //     while (1) {
-    //         // HAL_Delay(500);
-    //         // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
-    //     }
-    // }
-
-    // res = xTaskCreate(MyTask1, "Second Task", 256, NULL,configMAX_PRIORITIES, NULL);
-    // if (res != pdTRUE) {
-    //     while (1) {
-    //         // HAL_Delay(500);
-    //         // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
-    //     }
-    // }
 
     res = xTaskCreate(LedTask, "LED Task", 128,NULL,configMAX_PRIORITIES, NULL);
     if (res != pdTRUE) {
