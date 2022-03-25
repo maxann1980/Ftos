@@ -50,8 +50,8 @@ set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/${LINKER_SCRIPT_NAME}.ld)
 # -Os - оптимизация по размеру, пытается скомпилировать минимальный размер
 # -Ofast - оптимизация по скорости испольнения кода
 # -Og - оптимизация для дебага
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=${CMAKE_SYSTEM_PROCESSOR} -g3 -std=gnu++${CMAKE_CXX_STANDARD} -Os -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-exceptions -fno-threadsafe-statics -fno-use-cxa-atexit -Wall -std=c++17 -fstack-usage -mthumb -fno-exceptions -fno-rtti ")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=${CMAKE_SYSTEM_PROCESSOR} -std=gnu${CMAKE_C_STANDARD} -g3 -Os -ffunction-sections -fdata-sections -fno-strict-aliasing -Wall -fstack-usage ")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=${CMAKE_SYSTEM_PROCESSOR} -g3 -std=gnu++${CMAKE_CXX_STANDARD} -O0 -ffunction-sections -fdata-sections -fno-strict-aliasing -fno-exceptions -fno-threadsafe-statics -fno-use-cxa-atexit -Wall -std=c++17 -fstack-usage -mthumb -fno-exceptions -fno-rtti ")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=${CMAKE_SYSTEM_PROCESSOR} -std=gnu${CMAKE_C_STANDARD} -g3 -O0 -ffunction-sections -fdata-sections -fno-strict-aliasing -Wall -fstack-usage ")
 set(CMAKE_EXE_LINKER_FLAGS "-mcpu=${CMAKE_SYSTEM_PROCESSOR} -g3 -T ${LINKER_SCRIPT} -Wl,-Map=${PROJECT_NAME}.map  -Wl,--gc-sections -static -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group -Wl,--print-memory-usage ")
 set(CMAKE_ASM_FLAGS "-mcpu=${CMAKE_SYSTEM_PROCESSOR} -g3 -c -x assembler-with-cpp -mthumb")
 

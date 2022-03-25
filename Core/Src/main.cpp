@@ -5,73 +5,62 @@
 #include "string.h"
 #include "task.h"
 
-#define IDLE_BUF_SIZE   30
+#define BUF_SIZE   100
 
-typedef struct TaskData_t {
-    uint8_t *str;
-    uint32_t period;
-
-} TaskData;
-
+uint32_t idle_count;
 UART_HandleTypeDef huart2;
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 
-uint8_t task1_text[] = "Hello from First Task \r\n";
-uint8_t task2_text[] = "*******Hello from Second Task*******\r\n";
-volatile uint32_t idle_count = 0;
+xTaskHandle TaskHandle1;
+xTaskHandle TaskHandle2;
 
-
-void MyTask(void *pvParameters) {
-    uint16_t size = strlen((const char *)pvParameters);
-    uint8_t buf[IDLE_BUF_SIZE] = {0};
+void Task1(void *pvParameters) {
+    uint8_t buff[BUF_SIZE] = {0};
     while (1) {
-        for (int i = 0; i < size; ++i) {
-            HAL_UART_Transmit(&huart2, &((uint8_t *)pvParameters)[i], 1, 100);
+        snprintf((char *)buff, BUF_SIZE, "Task  1 priority : %ld \r\n", uxTaskPriorityGet(NULL));
+        size_t size = strlen((char *)buff);
+        for (size_t k = 0; k < size; ++k) {
+            HAL_UART_Transmit(&huart2, (uint8_t *)&buff[k], 1, 100);
         }
-        snprintf((char*)buf,IDLE_BUF_SIZE,"idle count : %ld \r\n",idle_count);
-        int cnt_size = strlen((char*)buf);
-        for (int i = 0; i < cnt_size; ++i) {
-            HAL_UART_Transmit(&huart2, &buf[i], 1, 100);
+        // custom delay
+        for (uint32_t d = 0; d < 1000000; ++d) {
         }
-        vTaskDelay(pdMS_TO_TICKS(1200));
     }
     vTaskDelete(NULL);
 }
 
-void CommonTask(void *pvParameters) {
-    volatile TaskData* params = (TaskData*)pvParameters;
-    uint16_t size = strlen((const char*)params->str);
+void Task2(void *pvParameters) {
+    uint8_t buff[BUF_SIZE] = {0};
     while (1) {
-        for (int i=0; i < size; ++i) {
-            HAL_UART_Transmit(&huart2,(uint8_t*)&params->str[i], 1, 100);
+        snprintf((char *)buff, BUF_SIZE, "Task  2 priority : %ld \r\n", uxTaskPriorityGet(NULL));
+        size_t size = strlen((char *)buff);
+        for (size_t k = 0; k < size; ++k) {
+            HAL_UART_Transmit(&huart2, (uint8_t *)&buff[k], 1, 100);
         }
-        vTaskDelay(pdMS_TO_TICKS(params->period));
+        // custom delay
+        for (uint32_t d = 0; d < 1000000; ++d) {
+        }
     }
     vTaskDelete(NULL);
 }
 
-void LedTask(void *pvParameters) {
-    portTickType LastWakeTime;
-    LastWakeTime = xTaskGetTickCount();
+void MainTask(void *pvParameters) {
     while (1) {
-        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_1);
-        vTaskDelayUntil( &LastWakeTime, pdMS_TO_TICKS(1000) );
+        auto prio_task1 = uxTaskPriorityGet(TaskHandle1);
+        vTaskPrioritySet(TaskHandle1,prio_task1 + 1);
+        vTaskDelay(2000);
+        prio_task1 = uxTaskPriorityGet(TaskHandle1);
+        vTaskPrioritySet(TaskHandle1,prio_task1 - 2);
+        vTaskDelay(2000);
+        prio_task1 = uxTaskPriorityGet(TaskHandle1);
+        vTaskPrioritySet(TaskHandle1,prio_task1 + 1);
+        vTaskDelay(2000);
     }
     vTaskDelete(NULL);
 }
-
-void LedTask1(void *pvParameters) {
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
-    }
-    vTaskDelete(NULL);
-}
-
-TaskData data1 ,data2;
 
 int main(void) {
     HAL_Init();
@@ -79,41 +68,17 @@ int main(void) {
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
-    data1 = {
-        .str = task1_text,
-        .period = 1000
-    };
+    auto res = xTaskCreate(Task1,"Task1",256, NULL,MID_PRIORITY,&TaskHandle1);
+    if (res != pdTRUE)
+        Error_Handler();
+    
+    res = xTaskCreate(Task2,"Task2",256, NULL,MID_PRIORITY,&TaskHandle2);
+    if (res != pdTRUE)
+        Error_Handler();
 
-
-    auto res = xTaskCreate(CommonTask,"Common Task1",256, (void*)&data1,configMAX_PRIORITIES,NULL);
-    if (res != pdTRUE) {
-        while (1) {
-            // HAL_Delay(500);
-            // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
-        }
-    }
-
-    res = xTaskCreate(MyTask, "Second Task", 256, task2_text,configMAX_PRIORITIES, NULL);
-    if (res != pdTRUE) {
-        while (1) {
-            // HAL_Delay(500);
-            // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
-        }
-    }
-
-    res = xTaskCreate(LedTask, "LED Task", 128,NULL,configMAX_PRIORITIES, NULL);
-    if (res != pdTRUE) {
-        while (1) {
-
-        }
-    }
-
-    res = xTaskCreate(LedTask1, "LED Task1", 128,NULL,configMAX_PRIORITIES, NULL);
-    if (res != pdTRUE) {
-        while (1) {
-
-        }
-    }
+    res = xTaskCreate(MainTask, "MAINTask", 256, NULL,HIGH_PRIORITY, NULL);
+    if (res != pdTRUE)
+        Error_Handler();
 
     vTaskStartScheduler();
 
