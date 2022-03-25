@@ -238,9 +238,12 @@ void EXTI15_10_IRQHandler(void) {
     if (__HAL_GPIO_EXTI_GET_IT(btn1_Pin) != 0x00u) {
         xSemaphoreGiveFromISR(BinSem1,&xHigherPriorityTaskWoken);
         __HAL_GPIO_EXTI_CLEAR_IT(btn1_Pin);
-        // HAL_GPIO_EXTI_Callback(GPIO_Pin);
+        // in case higher priority task was woken
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     } else if (__HAL_GPIO_EXTI_GET_IT(btn2_Pin) != 0x00u) {
         xSemaphoreGiveFromISR(BinSem2,&xHigherPriorityTaskWoken);
         __HAL_GPIO_EXTI_CLEAR_IT(btn2_Pin);
+        // in case higher priority task was woken
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }
