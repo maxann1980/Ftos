@@ -41,6 +41,10 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+#define btn2_Pin GPIO_PIN_14
+#define btn2_GPIO_Port GPIOB
+#define btn1_Pin GPIO_PIN_15
+#define btn1_GPIO_Port GPIOB
 
 /* USER CODE END EC */
 

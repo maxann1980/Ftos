@@ -5,6 +5,7 @@
 #include "stdio.h"
 #include "string.h"
 #include "task.h"
+#include "semphr.h"
 
 #define BUF_SIZE 100
 #define LOOP_DELAY 1000000
@@ -13,7 +14,8 @@
 uint32_t idle_count;
 UART_HandleTypeDef huart2;
 
-xQueueHandle MyQueue;
+xSemaphoreHandle BinSem1 = NULL;
+xSemaphoreHandle BinSem2 = NULL;
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
@@ -21,61 +23,30 @@ static void MX_USART2_UART_Init(void);
 
 xTaskHandle TaskHandle1;
 xTaskHandle TaskHandle2;
-typedef struct CustomType_t {
-    uint32_t task_num;
-    uint32_t val;
-} CustomType;
 
 void Task1(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
-    CustomType data = {
-        .task_num = 1,
-        .val = 567
-    };
     while (1) {
-        snprintf((char *)buff, BUF_SIZE, "Task 1 push %ld to queue\r\n",data.val);
-        size_t size = strlen((char *)buff);
-        while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, size, 1000) != HAL_OK) {}
-        if ( pdPASS != xQueueSend(MyQueue,&data, pdMS_TO_TICKS(10))) {
-            snprintf((char *)buff, BUF_SIZE, " Task 1. Failed to push value to queue!!!\r\n");
-            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, size, 1000) != HAL_OK) {}
+        if ( pdPASS == xSemaphoreTake( BinSem1, portMAX_DELAY )) {
+            snprintf((char *)buff, BUF_SIZE, "Task 1 . Received semaphore\r\n");
+            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
+        } else {
+            snprintf((char *)buff, BUF_SIZE, "Task 1 . Failed to receive semaphore\r\n");
+            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
         }
-        ++data.val;
-        vTaskDelay(pdMS_TO_TICKS(3000));
     }
     vTaskDelete(NULL);
 }
 
 void Task2(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
-    CustomType data = {
-        .task_num = 2,
-        .val = 111
-    };
     while (1) {
-        snprintf((char *)buff, BUF_SIZE, "Task 2 push %ld to queue\r\n",data.val);
-        size_t size = strlen((char *)buff);
-        while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, size, 1000) != HAL_OK) {}
-        if ( pdPASS != xQueueSend(MyQueue,&data, pdMS_TO_TICKS(10))) {
-            snprintf((char *)buff, BUF_SIZE, " Task 2. Failed to push value to queue!!!\r\n");
+        if ( pdPASS == xSemaphoreTake( BinSem2, portMAX_DELAY )) {
+            snprintf((char *)buff, BUF_SIZE, "Task 2 . Received semaphore\r\n");
             while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
-        }
-        ++data.val;
-        vTaskDelay(pdMS_TO_TICKS(4000));
-    }
-    vTaskDelete(NULL);
-}
-
-void ReaderTask(void *pvParameters) {
-    uint8_t buff[BUF_SIZE] = {0};
-    CustomType data;
-    while (1) {
-        if ( pdPASS ==  xQueueReceive(MyQueue, &data, portMAX_DELAY)) {
-            snprintf((char *)buff, BUF_SIZE, "QUEUE:  Received value %ld from task : %ld\r\n",data.val,data.task_num);
-            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {} 
         } else {
-            snprintf((char *)buff, BUF_SIZE, " Reader task. Failed to read from queue!!!\r\n");
-            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}        
+            snprintf((char *)buff, BUF_SIZE, "Task 2 . Failed to receive semaphore\r\n");
+            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
         }
     }
     vTaskDelete(NULL);
@@ -87,8 +58,12 @@ int main(void) {
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
-    MyQueue = xQueueCreate(QUEUE_SIZE, sizeof(CustomType));
-    if (MyQueue == NULL)
+    vSemaphoreCreateBinary(BinSem1);
+    if (BinSem1 == NULL)
+        Error_Handler();
+
+    vSemaphoreCreateBinary(BinSem2);
+    if (BinSem2 == NULL)
         Error_Handler();
 
     auto res = xTaskCreate(Task1, "Task1", 256, NULL, MID_PRIORITY, NULL);
@@ -96,10 +71,6 @@ int main(void) {
         Error_Handler();
 
     res = xTaskCreate(Task2, "Task2", 256, NULL, MID_PRIORITY, NULL);
-    if (res != pdTRUE)
-        Error_Handler();
-
-    res = xTaskCreate(ReaderTask, "ReaderTask", 256, NULL, HIGH_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 
@@ -164,9 +135,10 @@ static void MX_GPIO_Init(void) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
 
     /* GPIO Ports Clock Enable */
-    __HAL_RCC_GPIOD_CLK_ENABLE();
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-    __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
     /*Configure GPIO pin Output Level */
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET);
@@ -178,6 +150,16 @@ static void MX_GPIO_Init(void) {
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : btn2_Pin btn1_Pin */
+    GPIO_InitStruct.Pin = btn2_Pin | btn1_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+      /* EXTI interrupt init*/
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 void Error_Handler(void) {

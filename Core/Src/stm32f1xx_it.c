@@ -22,6 +22,7 @@
 #include "stm32f1xx_it.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 /* USER CODE END Includes */
@@ -60,6 +61,9 @@
 
 /* USER CODE BEGIN EV */
 extern TIM_HandleTypeDef htim1;
+extern UART_HandleTypeDef huart2;
+extern xSemaphoreHandle BinSem1;
+extern xSemaphoreHandle BinSem2;
 
 /* USER CODE END EV */
 
@@ -216,4 +220,27 @@ void TIM1_UP_IRQHandler(void)
   /* USER CODE BEGIN TIM1_UP_IRQn 1 */
 
   /* USER CODE END TIM1_UP_IRQn 1 */
+}
+
+void USART2_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART2_IRQn 0 */
+
+  /* USER CODE END USART2_IRQn 0 */
+  HAL_UART_IRQHandler(&huart2);
+  /* USER CODE BEGIN USART2_IRQn 1 */
+
+  /* USER CODE END USART2_IRQn 1 */
+}
+
+void EXTI15_10_IRQHandler(void) {
+    portBASE_TYPE xHigherPriorityTaskWoken;
+    if (__HAL_GPIO_EXTI_GET_IT(btn1_Pin) != 0x00u) {
+        xSemaphoreGiveFromISR(BinSem1,&xHigherPriorityTaskWoken);
+        __HAL_GPIO_EXTI_CLEAR_IT(btn1_Pin);
+        // HAL_GPIO_EXTI_Callback(GPIO_Pin);
+    } else if (__HAL_GPIO_EXTI_GET_IT(btn2_Pin) != 0x00u) {
+        xSemaphoreGiveFromISR(BinSem2,&xHigherPriorityTaskWoken);
+        __HAL_GPIO_EXTI_CLEAR_IT(btn2_Pin);
+    }
 }
