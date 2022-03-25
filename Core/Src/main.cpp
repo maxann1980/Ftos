@@ -6,6 +6,7 @@
 #include "task.h"
 
 #define BUF_SIZE   100
+#define LOOP_DELAY   1000000
 
 uint32_t idle_count;
 UART_HandleTypeDef huart2;
@@ -19,33 +20,33 @@ xTaskHandle TaskHandle2;
 
 void Task1(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
+    snprintf((char *)buff, BUF_SIZE, "Task  1 running\r\n");
+    size_t size = strlen((char *)buff);
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(800));
-        snprintf((char *)buff, BUF_SIZE, "Task  1 running\r\n");
-        size_t size = strlen((char *)buff);
-        for (size_t k = 0; k < size; ++k) {
-            HAL_UART_Transmit(&huart2, (uint8_t *)&buff[k], 1, 100);
+        for (int i=0 ;i < 5; ++i) {
+            for (size_t k = 0; k < size; ++k) {
+                HAL_UART_Transmit(&huart2, (uint8_t *)&buff[k], 1, 100);
+            }
+            for (size_t cnt = 0; cnt < LOOP_DELAY; ++cnt) {}
         }
+        taskYIELD();
     }
     vTaskDelete(NULL);
 }
 
 void Task2(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
+    snprintf((char *)buff, BUF_SIZE, "Task  2 running\r\n");
+    size_t size = strlen((char *)buff);
     while (1) {
-        snprintf((char *)buff, BUF_SIZE, "Task  2 running\r\n");
-        size_t size = strlen((char *)buff);
-        for (size_t k = 0; k < size; ++k) {
-            HAL_UART_Transmit(&huart2, (uint8_t *)&buff[k], 1, 100);
+        for (int i=0 ;i < 5; ++i) {
+            for (size_t k = 0; k < size; ++k) {
+                HAL_UART_Transmit(&huart2, (uint8_t *)&buff[k], 1, 100);
+            }
+            for (size_t cnt = 0; cnt < LOOP_DELAY; ++cnt) {}
         }
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        taskYIELD();
     }
-    vTaskDelete(NULL);
-}
-
-void MainTask(void *pvParameters) {
-    xTaskCreate(Task1,"Task1",256, NULL,MID_PRIORITY,NULL);
-    xTaskCreate(Task2,"Task2",256, NULL,MID_PRIORITY,NULL);
     vTaskDelete(NULL);
 }
 
@@ -55,7 +56,11 @@ int main(void) {
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
-    auto res = xTaskCreate(MainTask, "MAINTask", 256, NULL,HIGH_PRIORITY, NULL);
+    auto res = xTaskCreate(Task1, "Task1", 256, NULL,HIGH_PRIORITY, NULL);
+    if (res != pdTRUE)
+        Error_Handler();
+
+    res = xTaskCreate(Task2, "Task2", 256, NULL,HIGH_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 
