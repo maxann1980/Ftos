@@ -20,13 +20,11 @@ xTaskHandle TaskHandle2;
 void Task1(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
     while (1) {
-        snprintf((char *)buff, BUF_SIZE, "Task  1 priority : %ld \r\n", uxTaskPriorityGet(NULL));
+        vTaskDelay(pdMS_TO_TICKS(800));
+        snprintf((char *)buff, BUF_SIZE, "Task  1 running\r\n");
         size_t size = strlen((char *)buff);
         for (size_t k = 0; k < size; ++k) {
             HAL_UART_Transmit(&huart2, (uint8_t *)&buff[k], 1, 100);
-        }
-        // custom delay
-        for (uint32_t d = 0; d < 1000000; ++d) {
         }
     }
     vTaskDelete(NULL);
@@ -35,30 +33,19 @@ void Task1(void *pvParameters) {
 void Task2(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
     while (1) {
-        snprintf((char *)buff, BUF_SIZE, "Task  2 priority : %ld \r\n", uxTaskPriorityGet(NULL));
+        snprintf((char *)buff, BUF_SIZE, "Task  2 running\r\n");
         size_t size = strlen((char *)buff);
         for (size_t k = 0; k < size; ++k) {
             HAL_UART_Transmit(&huart2, (uint8_t *)&buff[k], 1, 100);
         }
-        // custom delay
-        for (uint32_t d = 0; d < 1000000; ++d) {
-        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
     vTaskDelete(NULL);
 }
 
 void MainTask(void *pvParameters) {
-    while (1) {
-        auto prio_task1 = uxTaskPriorityGet(TaskHandle1);
-        vTaskPrioritySet(TaskHandle1,prio_task1 + 1);
-        vTaskDelay(2000);
-        prio_task1 = uxTaskPriorityGet(TaskHandle1);
-        vTaskPrioritySet(TaskHandle1,prio_task1 - 2);
-        vTaskDelay(2000);
-        prio_task1 = uxTaskPriorityGet(TaskHandle1);
-        vTaskPrioritySet(TaskHandle1,prio_task1 + 1);
-        vTaskDelay(2000);
-    }
+    xTaskCreate(Task1,"Task1",256, NULL,MID_PRIORITY,NULL);
+    xTaskCreate(Task2,"Task2",256, NULL,MID_PRIORITY,NULL);
     vTaskDelete(NULL);
 }
 
@@ -68,15 +55,7 @@ int main(void) {
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
-    auto res = xTaskCreate(Task1,"Task1",256, NULL,MID_PRIORITY,&TaskHandle1);
-    if (res != pdTRUE)
-        Error_Handler();
-    
-    res = xTaskCreate(Task2,"Task2",256, NULL,MID_PRIORITY,&TaskHandle2);
-    if (res != pdTRUE)
-        Error_Handler();
-
-    res = xTaskCreate(MainTask, "MAINTask", 256, NULL,HIGH_PRIORITY, NULL);
+    auto res = xTaskCreate(MainTask, "MAINTask", 256, NULL,HIGH_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 
