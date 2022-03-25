@@ -21,19 +21,26 @@ static void MX_USART2_UART_Init(void);
 
 xTaskHandle TaskHandle1;
 xTaskHandle TaskHandle2;
+typedef struct CustomType_t {
+    uint32_t task_num;
+    uint32_t val;
+} CustomType;
 
 void Task1(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
-    int val = 0;
+    CustomType data = {
+        .task_num = 1,
+        .val = 567
+    };
     while (1) {
-        snprintf((char *)buff, BUF_SIZE, "Task 1 push %d to queue\r\n",val);
+        snprintf((char *)buff, BUF_SIZE, "Task 1 push %ld to queue\r\n",data.val);
         size_t size = strlen((char *)buff);
         while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, size, 1000) != HAL_OK) {}
-        if ( pdPASS != xQueueSend(MyQueue,&val, pdMS_TO_TICKS(10))) {
+        if ( pdPASS != xQueueSend(MyQueue,&data, pdMS_TO_TICKS(10))) {
             snprintf((char *)buff, BUF_SIZE, " Task 1. Failed to push value to queue!!!\r\n");
             while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, size, 1000) != HAL_OK) {}
         }
-        ++val;
+        ++data.val;
         vTaskDelay(pdMS_TO_TICKS(3000));
     }
     vTaskDelete(NULL);
@@ -41,16 +48,19 @@ void Task1(void *pvParameters) {
 
 void Task2(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
-    int val = 1000;
+    CustomType data = {
+        .task_num = 2,
+        .val = 111
+    };
     while (1) {
-        snprintf((char *)buff, BUF_SIZE, "Task 2 push %d to queue\r\n",val);
+        snprintf((char *)buff, BUF_SIZE, "Task 2 push %ld to queue\r\n",data.val);
         size_t size = strlen((char *)buff);
         while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, size, 1000) != HAL_OK) {}
-        if ( pdPASS != xQueueSend(MyQueue,&val, pdMS_TO_TICKS(10))) {
+        if ( pdPASS != xQueueSend(MyQueue,&data, pdMS_TO_TICKS(10))) {
             snprintf((char *)buff, BUF_SIZE, " Task 2. Failed to push value to queue!!!\r\n");
             while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
         }
-        ++val;
+        ++data.val;
         vTaskDelay(pdMS_TO_TICKS(4000));
     }
     vTaskDelete(NULL);
@@ -58,10 +68,10 @@ void Task2(void *pvParameters) {
 
 void ReaderTask(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
-    int value;
+    CustomType data;
     while (1) {
-        if ( pdPASS ==  xQueueReceive(MyQueue, &value, portMAX_DELAY)) {
-            snprintf((char *)buff, BUF_SIZE, " Received value from queue : %d\r\n",value);
+        if ( pdPASS ==  xQueueReceive(MyQueue, &data, portMAX_DELAY)) {
+            snprintf((char *)buff, BUF_SIZE, "QUEUE:  Received value %ld from task : %ld\r\n",data.val,data.task_num);
             while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {} 
         } else {
             snprintf((char *)buff, BUF_SIZE, " Reader task. Failed to read from queue!!!\r\n");
@@ -77,7 +87,7 @@ int main(void) {
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
-    MyQueue = xQueueCreate(QUEUE_SIZE, sizeof(int));
+    MyQueue = xQueueCreate(QUEUE_SIZE, sizeof(CustomType));
     if (MyQueue == NULL)
         Error_Handler();
 
@@ -89,7 +99,7 @@ int main(void) {
     if (res != pdTRUE)
         Error_Handler();
 
-    res = xTaskCreate(ReaderTask, "ReaderTask", 256, NULL, MID_PRIORITY, NULL);
+    res = xTaskCreate(ReaderTask, "ReaderTask", 256, NULL, HIGH_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 
