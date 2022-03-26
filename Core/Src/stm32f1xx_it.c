@@ -30,7 +30,6 @@ extern UART_HandleTypeDef huart2;
 extern xSemaphoreHandle BinSem1;
 extern xSemaphoreHandle BinSem2;
 
-static uint8_t buf[] = {"Hello from interrupt\r\n"};
 
 void NMI_Handler(void) {
     /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
@@ -179,14 +178,9 @@ void USART2_IRQHandler(void) {
 }
 
 void EXTI15_10_IRQHandler(void) {
-    portBASE_TYPE xHigherPriorityTaskWoken;
     if (__HAL_GPIO_EXTI_GET_IT(btn1_Pin) != 0x00u) {
         __HAL_GPIO_EXTI_CLEAR_IT(btn1_Pin);
     } else if (__HAL_GPIO_EXTI_GET_IT(btn2_Pin) != 0x00u) {
         __HAL_GPIO_EXTI_CLEAR_IT(btn2_Pin);
-        for (int i = 0; i < sizeof(buf); ++i) {
-            while( (huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) { }
-            huart2.Instance->DR = buf[i] & 0xFFU;
-        }
     }
 }

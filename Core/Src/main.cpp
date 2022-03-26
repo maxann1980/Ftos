@@ -29,16 +29,37 @@ void Task1(void *pvParameters) {
     uint32_t counter = 0;
     uint32_t size = 0;
     while (1) {
-        snprintf((char*)buff,BUF_SIZE,"*********** Task running! Counter : %ld  ******************\r\n", counter);
+        snprintf((char*)buff,BUF_SIZE,"********************** Task 1 running! Counter : %ld  ***********************\r\n", counter);
         size = strlen((char*)buff);
-        taskENTER_CRITICAL();
         for (uint32_t i = 0; i < size; ++i) {
             while( (huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) { }
             huart2.Instance->DR = buff[i] & 0xFFU;
         }
-        taskEXIT_CRITICAL();
         ++counter;
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    vTaskDelete(NULL);
+}
+
+void Task2(void *pvParameters) {
+    uint8_t buff[BUF_SIZE] = {0};
+    uint32_t counter = 0;
+    uint32_t size = 0;
+    while (1) {
+        vTaskSuspendAll();
+        for (int i = 0; i < 5; ++i) {
+            snprintf((char *)buff, BUF_SIZE, "######################### Task 2 working! Number : %ld  ########################\r\n", counter);
+            size = strlen((char *)buff);
+            for (uint32_t i = 0; i < size; ++i) {
+                while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
+                }
+                huart2.Instance->DR = buff[i] & 0xFFU;
+            }
+            ++counter;
+            for (uint32_t i=0; i < LOOP_DELAY; ++i) {}
+        }
+        xTaskResumeAll();
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
     vTaskDelete(NULL);
 }
@@ -51,6 +72,10 @@ int main(void) {
 
 
     auto res = xTaskCreate(Task1, "Task1", 256, NULL, MID_PRIORITY, NULL);
+    if (res != pdTRUE)
+        Error_Handler();
+
+    res = xTaskCreate(Task2, "Task2", 256, NULL, MID_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 
