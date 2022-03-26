@@ -16,77 +16,55 @@
 uint32_t idle_count;
 UART_HandleTypeDef huart2;
 
+xQueueHandle xQueue1 = NULL;
+xQueueHandle xQueue2 = NULL;
+
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-
-// xTaskHandle TaskHandle1;
-// xTaskHandle TaskHandle2;
-
-// void Task1(void *pvParameters) {
-//     while (1) {
-//         xQueueSend(PrinterQueue,&task1_text,portMAX_DELAY);
-//         vTaskDelay(pdMS_TO_TICKS(1000));
-//     }
-//     vTaskDelete(NULL);
-// }
-
-// void Task2(void *pvParameters) {
-//     while (1) {
-//         xQueueSend(PrinterQueue,&task2_text,portMAX_DELAY);
-//         vTaskDelay(pdMS_TO_TICKS(1000));
-//     }
-//     vTaskDelete(NULL);
-// }
-
-// void LED_Task(void *pvParameters) {
-//     while(1) {
-//         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
-//         for (uint32_t i=0; i < LOOP_DELAY; ++i) {}
-//         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
-//         vTaskDelay(pdMS_TO_TICKS(500));
-//     }
-// } 
-
-// void Printer_Task(void *pvParameters) {
-//     char* data;
-//     while(1) {
-//         xQueueReceive(PrinterQueue,&data,portMAX_DELAY);
-//         for (uint32_t i = 0; i < strlen(data); ++i) {
-//             while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
-//             }
-//             huart2.Instance->DR = data[i] & 0xFFU;
-//         }
-//     }
-// }
 
 static uint8_t buff[BUF_SIZE] = {0};
 
 void CoRoutineFunction1(xCoRoutineHandle xHandle, unsigned portBASE_TYPE uxIndex) {
     crSTART(xHandle);
+    static uint16_t val;
+    static portBASE_TYPE xResult;
     for (;;) {
-        snprintf((char*)buff,BUF_SIZE,"coroutine 1 running \r\n");
-        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
-        crDELAY(xHandle,pdMS_TO_TICKS(rand()%1000));
+        crQUEUE_RECEIVE(xHandle,xQueue1,&val,portMAX_DELAY,&xResult);
+        if (pdTRUE == xResult) {
+            snprintf((char*)buff,BUF_SIZE,"coroutine 1 received value : %d \r\n",val);
+            HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+        }
     }
     crEND();
 }
 
 void CoRoutineFunction2(xCoRoutineHandle xHandle, unsigned portBASE_TYPE uxIndex) {
     crSTART(xHandle);
+    static uint16_t val;
+    static portBASE_TYPE xResult;
     for (;;) {
-        crDELAY( xHandle,pdMS_TO_TICKS( rand()%1000));
-        snprintf((char*)buff,BUF_SIZE,"coroutine 2 running \r\n");
-        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+        crQUEUE_RECEIVE(xHandle,xQueue2,&val,portMAX_DELAY,&xResult);
+        if (pdTRUE == xResult) {
+            snprintf((char*)buff,BUF_SIZE,"coroutine 2 received value : %d \r\n",val);
+            HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+        }
     }
     crEND();
 }
+
 
 int main(void) {
     HAL_Init();
     SystemClock_Config();
     MX_GPIO_Init();
     MX_USART2_UART_Init();
+    xQueue1 = xQueueCreate(3, sizeof(unsigned long));
+    if (xQueue1 == NULL) 
+        Error_Handler();
+    xQueue2 = xQueueCreate(3, sizeof(unsigned long));
+    if (xQueue1 == NULL) 
+        Error_Handler();
 
     if (pdPASS != xCoRoutineCreate(CoRoutineFunction1,configMAX_CO_ROUTINE_PRIORITIES,1)) {
         Error_Handler();
