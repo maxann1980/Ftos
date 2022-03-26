@@ -30,6 +30,8 @@ xSemaphoreHandle BinSem2 = NULL;
 
 xSemaphoreHandle mutex = NULL;
 
+xQueueHandle PrinterQueue = NULL;
+
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
@@ -39,13 +41,8 @@ xTaskHandle TaskHandle2;
 
 void Task1(void *pvParameters) {
     while (1) {
-        xSemaphoreTake( mutex, portMAX_DELAY );
-        for (uint32_t i = 0; i < sizeof(task1_text); ++i) {
-            while( (huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) { }
-            huart2.Instance->DR = task1_text[i] & 0xFFU;
-        }
-        xSemaphoreGive( mutex); 
-        vTaskDelay(pdMS_TO_TICKS(100));
+        xQueueSend(PrinterQueue,&task1_text,portMAX_DELAY);
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
     vTaskDelete(NULL);
 }
@@ -84,16 +81,33 @@ void LED_Task(void *pvParameters) {
     }
 } 
 
+void Printer_Task(void *pvParameters) {
+    char* data;
+    while(1) {
+        xQueueReceive(PrinterQueue,&data,portMAX_DELAY);
+        xSemaphoreTake(mutex, portMAX_DELAY);
+        for (uint32_t i = 0; i < strlen(data); ++i) {
+            while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
+            }
+            huart2.Instance->DR = data[i] & 0xFFU;
+        }
+        xSemaphoreGive(mutex);
+    }
+} 
+
 int main(void) {
     HAL_Init();
     SystemClock_Config();
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
+    PrinterQueue = xQueueCreate(5, sizeof(char *));
+    if (PrinterQueue == NULL)
+        Error_Handler();
+
     mutex = xSemaphoreCreateMutex();
     if (mutex == NULL)
         Error_Handler();
-
 
     auto res = xTaskCreate(Task1, "Task1", 256, NULL, HIGH_PRIORITY, NULL);
     if (res != pdTRUE)
@@ -103,7 +117,7 @@ int main(void) {
     if (res != pdTRUE)
         Error_Handler();
 
-    res = xTaskCreate(LED_Task, "LED_Task", 256, NULL, MID_PRIORITY, NULL);
+    res = xTaskCreate(Printer_Task, "Printer_Task", 256, NULL, MID_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 

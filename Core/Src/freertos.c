@@ -22,12 +22,15 @@
 
 #include "main.h"
 #include "task.h"
+#include "queue.h"
+
+extern xQueueHandle PrinterQueue;
+
+uint8_t tick_hook_text[] = "hello tick hook\r\n";
 
 extern uint32_t idle_count;
-/* GetIdleTaskMemory prototype (linked to static allocation support) */
 void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize);
 
-/* USER CODE BEGIN GET_IDLE_TASK_MEMORY */
 static StaticTask_t xIdleTaskTCBBuffer;
 static StackType_t xIdleStack[configMINIMAL_STACK_SIZE];
 
@@ -38,11 +41,29 @@ void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackTyp
     /* place for user code */
 }
 
+// this function will be called in case task stack overflow
+// configCHECK_FOR_STACK_OVERFLOW has to be 1
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
     // TODO process error state
 }
 
+// this function will be called in case idle task has running state
+// configUSE_IDLE_HOOK has to be 1
 void vApplicationIdleHook(void) {
     // TODO some actions in idle state
     ++idle_count;
+}
+
+// this function will be called every time quant of OS
+// configUSE_TICK_HOOK has to be 1
+void vApplicationTickHook(void) {
+    // function is called from ISR
+    static int counter = 0;
+    portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
+    counter++;
+    // text will be printrd every 300mS
+    if (counter >= 300) {
+        xQueueSendToFrontFromISR(PrinterQueue, (char*)tick_hook_text,&xHigherPriorityTaskWoken);
+        counter = 0;
+    }
 }
