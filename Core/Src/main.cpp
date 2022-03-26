@@ -6,6 +6,8 @@
 #include "string.h"
 #include "task.h"
 #include "semphr.h"
+#include "croutine.h"
+#include "stdlib.h"
 
 #define BUF_SIZE 100
 #define LOOP_DELAY 1000000
@@ -14,67 +16,71 @@
 uint32_t idle_count;
 UART_HandleTypeDef huart2;
 
-char* task1_text ="\
-*******************************************************************************\r\n\
-********************************* TASK 1 RUNNING ******************************\r\n\
-*******************************************************************************\r\n\r\n";
-
-
-char* task2_text ="\
-###############################################################################\r\n\
-################################# TASK 2 RUNNING ##############################\r\n\
-###############################################################################\r\n\r\n";
-
-xSemaphoreHandle BinSem1 = NULL;
-xSemaphoreHandle BinSem2 = NULL;
-
-xSemaphoreHandle mutex = NULL;
-
-xQueueHandle PrinterQueue = NULL;
-
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 
-xTaskHandle TaskHandle1;
-xTaskHandle TaskHandle2;
+// xTaskHandle TaskHandle1;
+// xTaskHandle TaskHandle2;
 
-void Task1(void *pvParameters) {
-    while (1) {
-        xQueueSend(PrinterQueue,&task1_text,portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+// void Task1(void *pvParameters) {
+//     while (1) {
+//         xQueueSend(PrinterQueue,&task1_text,portMAX_DELAY);
+//         vTaskDelay(pdMS_TO_TICKS(1000));
+//     }
+//     vTaskDelete(NULL);
+// }
+
+// void Task2(void *pvParameters) {
+//     while (1) {
+//         xQueueSend(PrinterQueue,&task2_text,portMAX_DELAY);
+//         vTaskDelay(pdMS_TO_TICKS(1000));
+//     }
+//     vTaskDelete(NULL);
+// }
+
+// void LED_Task(void *pvParameters) {
+//     while(1) {
+//         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
+//         for (uint32_t i=0; i < LOOP_DELAY; ++i) {}
+//         HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
+//         vTaskDelay(pdMS_TO_TICKS(500));
+//     }
+// } 
+
+// void Printer_Task(void *pvParameters) {
+//     char* data;
+//     while(1) {
+//         xQueueReceive(PrinterQueue,&data,portMAX_DELAY);
+//         for (uint32_t i = 0; i < strlen(data); ++i) {
+//             while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
+//             }
+//             huart2.Instance->DR = data[i] & 0xFFU;
+//         }
+//     }
+// }
+
+static uint8_t buff[BUF_SIZE] = {0};
+
+void CoRoutineFunction1(xCoRoutineHandle xHandle, unsigned portBASE_TYPE uxIndex) {
+    crSTART(xHandle);
+    for (;;) {
+        snprintf((char*)buff,BUF_SIZE,"coroutine 1 running \r\n");
+        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+        crDELAY(xHandle,pdMS_TO_TICKS(rand()%1000));
     }
-    vTaskDelete(NULL);
+    crEND();
 }
 
-void Task2(void *pvParameters) {
-    while (1) {
-        xQueueSend(PrinterQueue,&task2_text,portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+void CoRoutineFunction2(xCoRoutineHandle xHandle, unsigned portBASE_TYPE uxIndex) {
+    crSTART(xHandle);
+    for (;;) {
+        crDELAY( xHandle,pdMS_TO_TICKS( rand()%1000));
+        snprintf((char*)buff,BUF_SIZE,"coroutine 2 running \r\n");
+        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
     }
-    vTaskDelete(NULL);
+    crEND();
 }
-
-void LED_Task(void *pvParameters) {
-    while(1) {
-        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
-        for (uint32_t i=0; i < LOOP_DELAY; ++i) {}
-        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-} 
-
-void Printer_Task(void *pvParameters) {
-    char* data;
-    while(1) {
-        xQueueReceive(PrinterQueue,&data,portMAX_DELAY);
-        for (uint32_t i = 0; i < strlen(data); ++i) {
-            while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
-            }
-            huart2.Instance->DR = data[i] & 0xFFU;
-        }
-    }
-} 
 
 int main(void) {
     HAL_Init();
@@ -82,21 +88,13 @@ int main(void) {
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
-    PrinterQueue = xQueueCreate(5, sizeof(char *));
-    if (PrinterQueue == NULL)
+    if (pdPASS != xCoRoutineCreate(CoRoutineFunction1,configMAX_CO_ROUTINE_PRIORITIES,1)) {
         Error_Handler();
+    }
 
-    auto res = xTaskCreate(Task1, "Task1", 256, NULL, HIGH_PRIORITY, NULL);
-    if (res != pdTRUE)
+    if (pdPASS != xCoRoutineCreate(CoRoutineFunction2,configMAX_CO_ROUTINE_PRIORITIES,1)) {
         Error_Handler();
-
-    res = xTaskCreate(Task2, "Task2", 256, NULL, LOW_PRIORITY_PLUS, NULL);
-    if (res != pdTRUE)
-        Error_Handler();
-
-    res = xTaskCreate(Printer_Task, "Printer_Task", 256, NULL, MID_PRIORITY, NULL);
-    if (res != pdTRUE)
-        Error_Handler();
+    }
 
     vTaskStartScheduler();
 

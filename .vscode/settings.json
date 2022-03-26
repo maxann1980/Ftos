@@ -7,6 +7,7 @@
         "cstdio": "cpp",
         "flash_w25.h": "c",
         "main.h": "c",
-        "freertosconfig.h": "c"
+        "freertosconfig.h": "c",
+        "croutine.h": "c"
     }
 }

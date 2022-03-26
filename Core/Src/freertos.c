@@ -23,10 +23,7 @@
 #include "main.h"
 #include "task.h"
 #include "queue.h"
-
-extern xQueueHandle PrinterQueue;
-
-char* tick_hook_text = "hello tick hook\r\n";
+#include "croutine.h"
 
 extern uint32_t idle_count;
 void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize);
@@ -52,18 +49,11 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
 void vApplicationIdleHook(void) {
     // TODO some actions in idle state
     ++idle_count;
+    vCoRoutineSchedule();
 }
 
 // this function will be called every time quant of OS
 // configUSE_TICK_HOOK has to be 1
 void vApplicationTickHook(void) {
-    // function is called from ISR
-    static int counter = 0;
-    portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
-    counter++;
-    // text will be printrd every 300mS
-    if (counter >= 500) {
-        xQueueSendToFrontFromISR(PrinterQueue, &tick_hook_text,&xHigherPriorityTaskWoken);
-        counter = 0;
-    }
+
 }
