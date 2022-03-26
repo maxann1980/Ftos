@@ -7,15 +7,28 @@
 #include "task.h"
 #include "semphr.h"
 
-#define BUF_SIZE 100
+#define BUF_SIZE 200
 #define LOOP_DELAY 1000000
 #define QUEUE_SIZE 10
 
 uint32_t idle_count;
 UART_HandleTypeDef huart2;
 
+uint8_t task1_text[] ="\
+*******************************************************************************\r\n\
+********************************* TASK 1 RUNNING ******************************\r\n\
+*******************************************************************************\r\n\r\n";
+
+
+uint8_t task2_text[] ="\
+###############################################################################\r\n\
+################################# TASK 2 RUNNING ##############################\r\n\
+###############################################################################\r\n\r\n";
+
 xSemaphoreHandle BinSem1 = NULL;
 xSemaphoreHandle BinSem2 = NULL;
+
+xSemaphoreHandle mutex = NULL;
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
@@ -25,40 +38,26 @@ xTaskHandle TaskHandle1;
 xTaskHandle TaskHandle2;
 
 void Task1(void *pvParameters) {
-    uint8_t buff[BUF_SIZE] = {0};
-    uint32_t counter = 0;
-    uint32_t size = 0;
     while (1) {
-        snprintf((char*)buff,BUF_SIZE,"********************** Task 1 running! Counter : %ld  ***********************\r\n", counter);
-        size = strlen((char*)buff);
-        for (uint32_t i = 0; i < size; ++i) {
+        xSemaphoreTake( mutex, portMAX_DELAY );
+        for (uint32_t i = 0; i < sizeof(task1_text); ++i) {
             while( (huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) { }
-            huart2.Instance->DR = buff[i] & 0xFFU;
+            huart2.Instance->DR = task1_text[i] & 0xFFU;
         }
-        ++counter;
+        xSemaphoreGive( mutex); 
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     vTaskDelete(NULL);
 }
 
 void Task2(void *pvParameters) {
-    uint8_t buff[BUF_SIZE] = {0};
-    uint32_t counter = 0;
-    uint32_t size = 0;
     while (1) {
-        vTaskSuspendAll();
-        for (int i = 0; i < 5; ++i) {
-            snprintf((char *)buff, BUF_SIZE, "######################### Task 2 working! Number : %ld  ########################\r\n", counter);
-            size = strlen((char *)buff);
-            for (uint32_t i = 0; i < size; ++i) {
-                while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
-                }
-                huart2.Instance->DR = buff[i] & 0xFFU;
-            }
-            ++counter;
-            for (uint32_t i=0; i < LOOP_DELAY; ++i) {}
+        xSemaphoreTake( mutex, portMAX_DELAY );
+        for (uint32_t i = 0; i < sizeof(task2_text); ++i) {
+            while( (huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) { }
+            huart2.Instance->DR = task2_text[i] & 0xFFU;
         }
-        xTaskResumeAll();
+        xSemaphoreGive( mutex);
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     vTaskDelete(NULL);
@@ -69,6 +68,10 @@ int main(void) {
     SystemClock_Config();
     MX_GPIO_Init();
     MX_USART2_UART_Init();
+
+    mutex = xSemaphoreCreateMutex();
+    if (mutex == NULL)
+        Error_Handler();
 
 
     auto res = xTaskCreate(Task1, "Task1", 256, NULL, MID_PRIORITY, NULL);
