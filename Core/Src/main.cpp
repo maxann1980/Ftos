@@ -26,28 +26,19 @@ xTaskHandle TaskHandle2;
 
 void Task1(void *pvParameters) {
     uint8_t buff[BUF_SIZE] = {0};
+    uint32_t counter = 0;
+    uint32_t size = 0;
     while (1) {
-        if ( pdPASS == xSemaphoreTake( BinSem1, portMAX_DELAY )) {
-            snprintf((char *)buff, BUF_SIZE, "Task 1 . Received semaphore\r\n");
-            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
-        } else {
-            snprintf((char *)buff, BUF_SIZE, "Task 1 . Failed to receive semaphore\r\n");
-            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
+        snprintf((char*)buff,BUF_SIZE,"*********** Task running! Counter : %ld  ******************\r\n", counter);
+        size = strlen((char*)buff);
+        taskENTER_CRITICAL();
+        for (uint32_t i = 0; i < size; ++i) {
+            while( (huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) { }
+            huart2.Instance->DR = buff[i] & 0xFFU;
         }
-    }
-    vTaskDelete(NULL);
-}
-
-void Task2(void *pvParameters) {
-    uint8_t buff[BUF_SIZE] = {0};
-    while (1) {
-        if ( pdPASS == xSemaphoreTake( BinSem2, portMAX_DELAY )) {
-            snprintf((char *)buff, BUF_SIZE, "Task 2 . Received semaphore\r\n");
-            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
-        } else {
-            snprintf((char *)buff, BUF_SIZE, "Task 2 . Failed to receive semaphore\r\n");
-            while (HAL_UART_Transmit(&huart2, (uint8_t *)buff, strlen((char *)buff), 1000) != HAL_OK) {}
-        }
+        taskEXIT_CRITICAL();
+        ++counter;
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
     vTaskDelete(NULL);
 }
@@ -58,19 +49,8 @@ int main(void) {
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
-    vSemaphoreCreateBinary(BinSem1);
-    if (BinSem1 == NULL)
-        Error_Handler();
-
-    vSemaphoreCreateBinary(BinSem2);
-    if (BinSem2 == NULL)
-        Error_Handler();
 
     auto res = xTaskCreate(Task1, "Task1", 256, NULL, MID_PRIORITY, NULL);
-    if (res != pdTRUE)
-        Error_Handler();
-
-    res = xTaskCreate(Task2, "Task2", 256, NULL, MID_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 
