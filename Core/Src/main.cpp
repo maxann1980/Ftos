@@ -7,7 +7,7 @@
 #include "task.h"
 #include "semphr.h"
 
-#define BUF_SIZE 200
+#define BUF_SIZE 100
 #define LOOP_DELAY 1000000
 #define QUEUE_SIZE 10
 
@@ -51,17 +51,38 @@ void Task1(void *pvParameters) {
 }
 
 void Task2(void *pvParameters) {
+    uint8_t buf[BUF_SIZE] = {0};
+    auto prio = uxTaskPriorityGet(NULL);
     while (1) {
-        xSemaphoreTake( mutex, portMAX_DELAY );
+        xSemaphoreTake(mutex, portMAX_DELAY);
         for (uint32_t i = 0; i < sizeof(task2_text); ++i) {
-            while( (huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) { }
+            while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
+            }
             huart2.Instance->DR = task2_text[i] & 0xFFU;
         }
-        xSemaphoreGive( mutex);
+        auto new_prio = uxTaskPriorityGet(NULL);
+        if (new_prio != prio) {
+            snprintf((char *)buf, BUF_SIZE, "Priority has been changed  : %ld  Initial prio was : %ld\r\n", new_prio,prio);
+            for (uint32_t i = 0; i < strlen((char *)buf); ++i) {
+                while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
+                }
+                huart2.Instance->DR = buf[i] & 0xFFU;
+            }
+        }
+        xSemaphoreGive(mutex);
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     vTaskDelete(NULL);
 }
+
+void LED_Task(void *pvParameters) {
+    while(1) {
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
+        for (uint32_t i=0; i < LOOP_DELAY; ++i) {}
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_SET);
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+} 
 
 int main(void) {
     HAL_Init();
@@ -74,11 +95,15 @@ int main(void) {
         Error_Handler();
 
 
-    auto res = xTaskCreate(Task1, "Task1", 256, NULL, MID_PRIORITY, NULL);
+    auto res = xTaskCreate(Task1, "Task1", 256, NULL, HIGH_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 
-    res = xTaskCreate(Task2, "Task2", 256, NULL, MID_PRIORITY, NULL);
+    res = xTaskCreate(Task2, "Task2", 256, NULL, LOW_PRIORITY_PLUS, NULL);
+    if (res != pdTRUE)
+        Error_Handler();
+
+    res = xTaskCreate(LED_Task, "LED_Task", 256, NULL, MID_PRIORITY, NULL);
     if (res != pdTRUE)
         Error_Handler();
 
