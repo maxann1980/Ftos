@@ -26,7 +26,7 @@
 
 extern xQueueHandle PrinterQueue;
 
-uint8_t tick_hook_text[] = "hello tick hook\r\n";
+char* tick_hook_text = "hello tick hook\r\n";
 
 extern uint32_t idle_count;
 void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize);
@@ -62,8 +62,8 @@ void vApplicationTickHook(void) {
     portBASE_TYPE xHigherPriorityTaskWoken = pdFALSE;
     counter++;
     // text will be printrd every 300mS
-    if (counter >= 300) {
-        xQueueSendToFrontFromISR(PrinterQueue, (char*)tick_hook_text,&xHigherPriorityTaskWoken);
+    if (counter >= 500) {
+        xQueueSendToFrontFromISR(PrinterQueue, &tick_hook_text,&xHigherPriorityTaskWoken);
         counter = 0;
     }
 }

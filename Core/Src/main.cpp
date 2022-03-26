@@ -14,13 +14,13 @@
 uint32_t idle_count;
 UART_HandleTypeDef huart2;
 
-uint8_t task1_text[] ="\
+char* task1_text ="\
 *******************************************************************************\r\n\
 ********************************* TASK 1 RUNNING ******************************\r\n\
 *******************************************************************************\r\n\r\n";
 
 
-uint8_t task2_text[] ="\
+char* task2_text ="\
 ###############################################################################\r\n\
 ################################# TASK 2 RUNNING ##############################\r\n\
 ###############################################################################\r\n\r\n";
@@ -48,26 +48,9 @@ void Task1(void *pvParameters) {
 }
 
 void Task2(void *pvParameters) {
-    uint8_t buf[BUF_SIZE] = {0};
-    auto prio = uxTaskPriorityGet(NULL);
     while (1) {
-        xSemaphoreTake(mutex, portMAX_DELAY);
-        for (uint32_t i = 0; i < sizeof(task2_text); ++i) {
-            while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
-            }
-            huart2.Instance->DR = task2_text[i] & 0xFFU;
-        }
-        auto new_prio = uxTaskPriorityGet(NULL);
-        if (new_prio != prio) {
-            snprintf((char *)buf, BUF_SIZE, "Priority has been changed  : %ld  Initial prio was : %ld\r\n", new_prio,prio);
-            for (uint32_t i = 0; i < strlen((char *)buf); ++i) {
-                while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
-                }
-                huart2.Instance->DR = buf[i] & 0xFFU;
-            }
-        }
-        xSemaphoreGive(mutex);
-        vTaskDelay(pdMS_TO_TICKS(100));
+        xQueueSend(PrinterQueue,&task2_text,portMAX_DELAY);
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
     vTaskDelete(NULL);
 }
@@ -85,13 +68,11 @@ void Printer_Task(void *pvParameters) {
     char* data;
     while(1) {
         xQueueReceive(PrinterQueue,&data,portMAX_DELAY);
-        xSemaphoreTake(mutex, portMAX_DELAY);
         for (uint32_t i = 0; i < strlen(data); ++i) {
             while ((huart2.Instance->SR & UART_FLAG_TXE) != UART_FLAG_TXE) {
             }
             huart2.Instance->DR = data[i] & 0xFFU;
         }
-        xSemaphoreGive(mutex);
     }
 } 
 
@@ -103,10 +84,6 @@ int main(void) {
 
     PrinterQueue = xQueueCreate(5, sizeof(char *));
     if (PrinterQueue == NULL)
-        Error_Handler();
-
-    mutex = xSemaphoreCreateMutex();
-    if (mutex == NULL)
         Error_Handler();
 
     auto res = xTaskCreate(Task1, "Task1", 256, NULL, HIGH_PRIORITY, NULL);
