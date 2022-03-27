@@ -28,8 +28,6 @@
 
 extern TIM_HandleTypeDef htim1;
 extern UART_HandleTypeDef huart2;
-extern xQueueHandle xQueue1;
-extern xQueueHandle xQueue2;
 
 
 void NMI_Handler(void) {
@@ -80,16 +78,9 @@ void USART2_IRQHandler(void) {
 }
 
 void EXTI15_10_IRQHandler(void) {
-    static portBASE_TYPE pxCoRoutineWoken ;
     if (__HAL_GPIO_EXTI_GET_IT(btn1_Pin) != 0x00u) {
-        static uint16_t val1 = 0;
-        crQUEUE_SEND_FROM_ISR(xQueue1,&val1,pxCoRoutineWoken);
-        ++val1;
         __HAL_GPIO_EXTI_CLEAR_IT(btn1_Pin);
     } else if (__HAL_GPIO_EXTI_GET_IT(btn2_Pin) != 0x00u) {
-        static uint16_t val2 = 0;
-        crQUEUE_SEND_FROM_ISR(xQueue2,&val2,pxCoRoutineWoken);
-        ++val2;
         __HAL_GPIO_EXTI_CLEAR_IT(btn2_Pin);
     }
 }

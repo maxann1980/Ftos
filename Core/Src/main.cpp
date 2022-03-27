@@ -8,50 +8,73 @@
 #include "semphr.h"
 #include "croutine.h"
 #include "stdlib.h"
+#include "timers.h"
 
 #define BUF_SIZE 100
-#define LOOP_DELAY 1000000
-#define QUEUE_SIZE 10
 
 uint32_t idle_count;
 UART_HandleTypeDef huart2;
-
-xQueueHandle xQueue1 = NULL;
-xQueueHandle xQueue2 = NULL;
+xTimerHandle THandle = NULL;
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 
-static uint8_t buff[BUF_SIZE] = {0};
-
-void CoRoutineFunction1(xCoRoutineHandle xHandle, unsigned portBASE_TYPE uxIndex) {
-    crSTART(xHandle);
-    static uint16_t val;
-    static portBASE_TYPE xResult;
-    for (;;) {
-        crQUEUE_RECEIVE(xHandle,xQueue1,&val,portMAX_DELAY,&xResult);
-        if (pdTRUE == xResult) {
-            snprintf((char*)buff,BUF_SIZE,"coroutine 1 received value : %d \r\n",val);
-            HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
-        }
-    }
-    crEND();
+void Timer1(xTimerHandle Timer) {
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_0);
 }
 
-void CoRoutineFunction2(xCoRoutineHandle xHandle, unsigned portBASE_TYPE uxIndex) {
-    crSTART(xHandle);
-    static uint16_t val;
-    static portBASE_TYPE xResult;
-    for (;;) {
-        crQUEUE_RECEIVE(xHandle,xQueue2,&val,portMAX_DELAY,&xResult);
-        if (pdTRUE == xResult) {
-            snprintf((char*)buff,BUF_SIZE,"coroutine 2 received value : %d \r\n",val);
-            HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
-        }
-    }
-    crEND();
+void Timer2(xTimerHandle Timer) {
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_1);
 }
+
+
+void TaskForTimer(void* params) {
+    uint8_t buff[BUF_SIZE] = {0};
+    auto interval = pdMS_TO_TICKS(1000);
+    xTimerHandle TimerHandle = NULL;
+    TimerHandle = xTimerCreate("Timer2",            // name for debug
+                            interval,               // timer period
+                            pdTRUE,                 // autoreload
+                            NULL,                   // timer id
+                            Timer2);                // callback function
+    
+    if ( NULL == TimerHandle )
+        vTaskDelete(NULL);
+    
+    snprintf((char*)buff,BUF_SIZE,"Timer2 created in Task.\r\n");
+    HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+
+    if (pdPASS == xTimerStart(TimerHandle,portMAX_DELAY)) {
+        snprintf((char*)buff,BUF_SIZE,"Timer2 has been started in Task.\r\n");
+        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+    } else {
+        snprintf((char*)buff,BUF_SIZE,"Failed to start Timer 2 in Task.\r\n");
+        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    for (int i = 0; i < 9; ++i) {
+        interval -= pdMS_TO_TICKS(100);
+        xTimerChangePeriod(TimerHandle, interval, portMAX_DELAY);
+        snprintf((char*)buff,BUF_SIZE,"Timer 2 interval changed.\r\n");
+        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+
+    xTimerDelete(TimerHandle,portMAX_DELAY);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1,GPIO_PIN_SET);
+    snprintf((char*)buff,BUF_SIZE,"Timer was deleted.\r\n");
+    HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+
+    while(1) {
+        snprintf((char*)buff,BUF_SIZE,"Task working.\r\n");
+        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+    vTaskDelete(NULL);
+}
+
 
 
 int main(void) {
@@ -59,20 +82,28 @@ int main(void) {
     SystemClock_Config();
     MX_GPIO_Init();
     MX_USART2_UART_Init();
-    xQueue1 = xQueueCreate(3, sizeof(unsigned long));
-    if (xQueue1 == NULL) 
-        Error_Handler();
-    xQueue2 = xQueueCreate(3, sizeof(unsigned long));
-    if (xQueue1 == NULL) 
-        Error_Handler();
+    uint8_t buff[BUF_SIZE] = {0};
 
-    if (pdPASS != xCoRoutineCreate(CoRoutineFunction1,configMAX_CO_ROUTINE_PRIORITIES,1)) {
+    THandle = xTimerCreate("Timer1",                // name for debug
+                            pdMS_TO_TICKS(1000),    // timer period
+                            pdTRUE,                 // autoreload
+                            NULL,                   // timer id
+                            Timer1);                // callback function
+    
+    if ( NULL == THandle )
         Error_Handler();
+    snprintf((char*)buff,BUF_SIZE,"Timer1 created in main.\r\n");
+    HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+
+    if ( pdPASS == xTimerReset(THandle,portMAX_DELAY)) {
+        snprintf((char*)buff,BUF_SIZE,"Timer1 has been started in main.\r\n");
+        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
+    } else {
+        snprintf((char*)buff,BUF_SIZE,"Failed to start timer 1 in main.\r\n");
+        HAL_UART_Transmit(&huart2,buff,strlen((char*)buff),1000);
     }
 
-    if (pdPASS != xCoRoutineCreate(CoRoutineFunction2,configMAX_CO_ROUTINE_PRIORITIES,1)) {
-        Error_Handler();
-    }
+    xTaskCreate(TaskForTimer,"TaskForTimer",256,NULL,configMAX_PRIORITIES,NULL);
 
     vTaskStartScheduler();
 
